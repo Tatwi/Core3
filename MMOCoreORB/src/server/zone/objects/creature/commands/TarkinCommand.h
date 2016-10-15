@@ -46,8 +46,8 @@ public:
 			
 			if(command == "aboutme"){
 				aboutMe(creature);
-			} else if (command == "newcommand"){
-				newCommand(creature, ghost, &args);
+			} else if (command == "houseplop"){
+				housePlop(creature, ghost);
 			} else {
 				throw Exception();
 			}
@@ -57,17 +57,17 @@ public:
 			text << endl;
 			text << "Tarkin: The Command" << endl;
 			text << "- - - - - - - - - - - - - - - - - - -" << endl;
-			text << "/aboutme"  << endl;
+			text << "/tarkin aboutme"  << endl;
 			text << "- Provides a list of helpful information about lots, vendors, etc."  << endl;
-			//text << "/newCommand"  << endl;
+			//text << "/tarkin newCommand"  << endl;
 			//text << "- Description of new command"  << endl;
 			text << endl;
 			
 			if (ghost->isAdmin()){
 				text << "Tarkin: Admin Commands" << endl;
 				text << "- - - - - - - - - - - - - - - - - - -" << endl;
-				text << "/newCommand"  << endl;
-				text << "- Description of new command"  << endl;
+				text << "/tarkin housePlop"  << endl;
+				text << "- Calls a menu that allows an admin to place a building where they're standing."  << endl;
 			}
 			
 			creature->sendSystemMessage(text.toString());
@@ -233,13 +233,23 @@ public:
 		creature->sendMessage(box->generateMessage());
 	}
 	
-	
-	// Template for new functionality
-	void newCommand(CreatureObject* creature, PlayerObject* ghost, StringTokenizer* args) const {
+	// Opens a window that allows an admin to place a structure from the list
+	void housePlop(CreatureObject* creature, PlayerObject* ghost) const {
+		// For an admin-only command
 		if (!ghost->isAdmin())
-			throw Exception(); // For an admin-only command
-			
-		creature->sendSystemMessage("New functionality goes here!");
+			throw Exception(); 
+		
+		if (creature->getParent() != NULL){
+			creature->sendSystemMessage("You must be outside to place a structure.");
+			throw Exception();
+		}
+
+		Lua* lua = DirectorManager::instance()->getLuaInstance();
+
+		Reference<LuaFunction*> housePlop = lua->createFunction("HousePlop", "openWindow", 0);
+		*housePlop << creature;
+
+		housePlop->callFunction();
 	}
 };
 
