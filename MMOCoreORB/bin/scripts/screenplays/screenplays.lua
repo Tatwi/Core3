@@ -526,3 +526,4 @@ includeFile("housing_system/custom_mos_entha.lua")
 
 -- Tarkin Admin Tools
 includeFile("tools/house_plop.lua")
+includeFile("tools/TarkinBuffTerminal.lua")
