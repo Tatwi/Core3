@@ -191,6 +191,7 @@ namespace server {
 		static int bazaarBotMakeCraftedItem(lua_State* L);
 		static int bazaarBotMakeLootItem(lua_State* L);
 		static int bazaarBotMakeResources(lua_State* L);
+		static int getRandomInSpawnResource(lua_State* L);
 
 	private:
 		void setupLuaPackagePath(Lua* luaEngine);

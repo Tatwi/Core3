@@ -354,7 +354,8 @@ void DirectorManager::initializeLuaEngine(Lua* luaEngine) {
 	lua_register(luaEngine->getLuaState(), "bazaarBotMakeCraftedItem", bazaarBotMakeCraftedItem);
 	lua_register(luaEngine->getLuaState(), "bazaarBotMakeLootItem", bazaarBotMakeLootItem);
 	lua_register(luaEngine->getLuaState(), "bazaarBotMakeResources", bazaarBotMakeResources);
-
+	lua_register(luaEngine->getLuaState(), "getRandomInSpawnResource", getRandomInSpawnResource);
+	
 	luaEngine->setGlobalInt("POSITIONCHANGED", ObserverEventType::POSITIONCHANGED);
 	luaEngine->setGlobalInt("CLOSECONTAINER", ObserverEventType::CLOSECONTAINER);
 	luaEngine->setGlobalInt("OBJECTDESTRUCTION", ObserverEventType::OBJECTDESTRUCTION);
@@ -3426,4 +3427,62 @@ int DirectorManager::bazaarBotMakeResources(lua_State* L) {
 	
 	Logger::console.info("BazaarBot Error: Didn't find resource container in inventory");
 	return 0;
+}
+
+// Return the name of a resource of the given class that is currently in spawn
+// Returns nil if no resource of the given class is in spawn
+int DirectorManager::getRandomInSpawnResource(lua_State* L){
+	String resourceType = lua_tostring(L, -1);
+	
+	ResourceManager* resMan = ServerCore::getZoneServer()->getResourceManager();
+	
+	if (resMan == NULL){
+		Logger::console.info("BazaarBot: Error getting resource manager");
+		return 0;
+	}
+	
+	ResourceSpawner* resSpawner = resMan->getResourceSpawner();
+	
+	if (resSpawner == NULL){
+		Logger::console.info("BazaarBot: Error getting resource spawner");
+		return 0;
+	}
+	
+	ResourceMap* map = resSpawner->getResourceMap();
+	
+	if (map == NULL){
+		Logger::console.info("BazaarBot: Error getting resource map");
+		return 0;
+	}
+	
+	Reference<ResourceMap*> resultsMap = new ResourceMap();
+	map->getTypeSubset(*resultsMap, resourceType);
+
+	if (resultsMap->isEmpty()) {
+		Logger::console.info("BazaarBot Error: No results from resource type.");
+		return 0;
+	}
+	
+	String currentSpawns[50];
+	int numOfSpawns = 0;
+	
+	for (int i = 0; i < resultsMap->size(); i++) {
+		ResourceSpawn* spawn = resultsMap->get(i);
+		
+		if (spawn->inShift()){
+			currentSpawns[numOfSpawns] = spawn->getName();
+			numOfSpawns++;
+		}
+	}
+	
+	int roll = System::random(numOfSpawns);
+	String retString = currentSpawns[roll];
+	
+	if (retString == ""){
+		lua_pushnil(L);
+	} else {
+		lua_pushstring(L, retString.toCharArray());
+	}
+	
+	return 1;
 }

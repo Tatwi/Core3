@@ -12,6 +12,8 @@
 -- bazaarBotListItem(): Sells the item provided on the desired bazaar
 --  bazaarBotListItem(pBazaarBot, itemObjectID, pBazzarTerminal, string description, int price, int duration in seconds, bool auction, bool premium)
 
+includeFile("bazaarbot/table_resources.lua")
+
 BazaarBot = ScreenPlay:new {
 	numberOfActs = 1,
 	BazaarBotID = 281474993877563, -- Make a character named BazaarBot and put its PlayerID number here (/getPlayerID BazaarBot).
@@ -26,8 +28,32 @@ function BazaarBot:start()
 	if (pTerminal ~= nil) then
 		-- Add menu and custom name
 		SceneObject(pTerminal):setObjectMenuComponent("ABTestMenuComponent")
-		SceneObject(pTerminal):setCustomObjectName("AuctionBot Trigger")
+		SceneObject(pTerminal):setCustomObjectName("BazaarBot Trigger")
 	end
+end
+
+function BazaarBot:pickResource()
+	local resourceName = nil
+	local retryCount = 0
+	
+	while (resourceName == nil) do
+		-- Pick a family
+		local famGroup = getRandomNumber(1,#BBResFamWeighted)
+		local family = getRandomNumber(1,#BBResFamWeighted[famGroup])
+		local familyName = BBResFamWeighted[famGroup][family]
+		
+		-- Pick a specific resource that is in spawn
+		local rand = getRandomNumber(1,#BBResCats[familyName])
+		local resourceCategory = BBResCats[familyName][rand]
+		resourceName = getRandomInSpawnResource(resourceCategory)
+		retryCount = retryCount + 1
+	end
+	
+	if retryCount > 0 then
+		printf("BazaarBot: Resource Picker tried again " .. tostring(retryCount) .. " times.\n")
+	end
+	
+	return resourceName
 end
 
 
@@ -37,10 +63,16 @@ function BazaarBot:test(pPlayer, pObject)
 	local price = 250
 	local pBazaarBot = getCreatureObject(281474993877563)
 	
-	local pItem = bazaarBotMakeResources(pBazaarBot, "Abesis", 1000)
-	local itemForSaleObjectID = SceneObject(pItem):getObjectID()
+	for i = 1, 100 do 
 	
-	bazaarBotListItem(pBazaarBot, itemForSaleObjectID, pVendor, description, price)
+		local resourceName = self:pickResource()
+		
+		local pItem = bazaarBotMakeResources(pBazaarBot, resourceName, 1000)
+		local itemForSaleObjectID = SceneObject(pItem):getObjectID()
+		
+		bazaarBotListItem(pBazaarBot, itemForSaleObjectID, pVendor, description, price)
+	
+	end
 	
 	CreatureObject(pPlayer):sendSystemMessage("Test Complete!")
 end
