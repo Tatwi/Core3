@@ -945,3 +945,36 @@ float LootManagerImplementation::calculateDotValue(float min, float max, float l
 
 	return value;
 }
+
+TangibleObject* LootManagerImplementation::bazaarBotCreateLoot(const String& lootGroup, int level, bool maxCondition) {
+	Reference<LootGroupTemplate*> group = lootGroupMap->getLootGroupTemplate(lootGroup);
+
+	if (group == NULL) {
+		warning("Loot group template requested does not exist: " + lootGroup);
+		return 0;
+	}
+
+	//Now we do the third roll for the item out of the group.
+	int roll = System::random(10000000);
+
+	String selection = group->getLootGroupEntryForRoll(roll);
+
+	//Check to see if the group entry is another group
+	if (lootGroupMap->lootGroupExists(selection))
+		return bazaarBotCreateLoot(selection, level, maxCondition);
+
+	//Entry wasn't another group, it should be a loot item
+	Reference<LootItemTemplate*> itemTemplate = lootGroupMap->getLootItemTemplate(selection);
+
+	if (itemTemplate == NULL) {
+		warning("Loot item template requested does not exist: " + group->getLootGroupEntryForRoll(roll) + " for templateName: " + group->getTemplateName());
+		return 0;
+	}
+
+	TangibleObject* obj = createLootObject(itemTemplate, level, maxCondition);
+
+	if (obj == NULL)
+		return 0;
+
+	return obj;
+}

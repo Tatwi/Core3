@@ -1797,3 +1797,76 @@ String AuctionManagerImplementation::removeColorCodes(const String& name) {
 
 	return itemName;
 }
+
+// BazaarBot item listing functionality
+void AuctionManagerImplementation::bazaarBotListItem(CreatureObject* player, uint64 objectid, SceneObject* vendor, const UnicodeString& description, int price) {
+
+	if (!vendor->isBazaarTerminal()) {
+		error("BazaarBot: Vendor was not a valid Bazaar Terminal object");
+		return;
+	}
+
+	ManagedReference<TradeSession*> tradeContainer = player->getActiveSession(SessionFacadeType::TRADE).castTo<TradeSession*>();
+
+	if (tradeContainer != NULL) {
+		zoneServer->getPlayerManager()->handleAbortTradeMessage(player);
+	}
+
+	ManagedReference<SceneObject*> objectToSell = zoneServer->getObject(objectid);
+	String vendorUID = getVendorUID(vendor);
+	bool stockroomSale = false;
+
+	if (objectToSell == NULL || objectToSell->isNoTrade() || objectToSell->containsNoTradeObjectRecursive()) {
+		error("BazaarBot: Generated object was NULL, No-Trade, or contains child objects");
+		return;
+	}
+
+	ManagedReference<Zone*> zone = vendor->getZone();
+	if (zone == NULL) {
+		error("BazaarBot: The zone containing the vendor was not found");
+		return;
+	}
+
+	if(auctionMap->containsItem(objectToSell->getObjectID())) {
+		error("BazaarBot: Attempted to sell item that was already for sale");
+		return;
+	}
+	
+	// Set some values used by createVendorItem
+	uint32 duration = 604800; // 7 days in seconds
+	bool auction = false;
+	bool premium = false;
+
+	ManagedReference<AuctionItem*> item = createVendorItem(player, objectToSell.get(), vendor, description, price, duration, auction, premium);
+
+	if(item == NULL) {
+		error("BazaarBot: createVendorItem returned NULL object");
+		return;
+	}
+
+	Locker locker(item);
+
+	int result = auctionMap->addItem(player, vendor, item);
+
+	if(result != ItemSoldMessage::SUCCESS) {
+		error("BazaarBot: Item was not successfully listed");
+		auctionMap->removeFromCommodityLimit(item);
+		return;
+	}
+
+	Locker objectToSellLocker(objectToSell);
+
+	objectToSell->destroyObjectFromWorld(true);
+
+	objectToSellLocker.release();
+
+	item->setPersistent(1);
+
+	if(item->isAuction()) {
+		Reference<Task*> newTask = new ExpireAuctionTask(_this.getReferenceUnsafeStaticCast(), item);
+		newTask->schedule((item->getExpireTime() - time(0)) * 1000);
+
+		Locker locker(&auctionEvents);
+		auctionEvents.put(item->getAuctionedItemObjectID(), newTask);
+	}
+}

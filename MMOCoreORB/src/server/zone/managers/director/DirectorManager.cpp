@@ -80,6 +80,12 @@
 #include "server/zone/objects/tangible/powerup/PowerupObject.h"
 #include "server/zone/objects/resource/ResourceSpawn.h"
 #include "server/zone/objects/tangible/component/Component.h"
+#include "server/zone/objects/manufactureschematic/ManufactureSchematic.h"
+#include "server/zone/objects/draftschematic/DraftSchematic.h"
+#include "server/zone/objects/factorycrate/FactoryCrate.h"
+#include "server/zone/managers/crafting/CraftingManager.h"
+#include "server/zone/managers/stringid/StringIdManager.h"
+#include "server/zone/managers/resource/ResourceManager.h"
 
 int DirectorManager::DEBUG_MODE = 0;
 int DirectorManager::ERROR_CODE = NO_ERROR;
@@ -344,6 +350,10 @@ void DirectorManager::initializeLuaEngine(Lua* luaEngine) {
 	lua_register(luaEngine->getLuaState(), "getQuestVectorMap", getQuestVectorMap);
 	lua_register(luaEngine->getLuaState(), "createQuestVectorMap", createQuestVectorMap);
 	lua_register(luaEngine->getLuaState(), "removeQuestVectorMap", removeQuestVectorMap);
+	lua_register(luaEngine->getLuaState(), "bazaarBotListItem", bazaarBotListItem);
+	lua_register(luaEngine->getLuaState(), "bazaarBotMakeCraftedItem", bazaarBotMakeCraftedItem);
+	lua_register(luaEngine->getLuaState(), "bazaarBotMakeLootItem", bazaarBotMakeLootItem);
+	lua_register(luaEngine->getLuaState(), "bazaarBotMakeResources", bazaarBotMakeResources);
 
 	luaEngine->setGlobalInt("POSITIONCHANGED", ObserverEventType::POSITIONCHANGED);
 	luaEngine->setGlobalInt("CLOSECONTAINER", ObserverEventType::CLOSECONTAINER);
@@ -3177,4 +3187,243 @@ void DirectorManager::removeQuestVectorMap(const String& keyString) {
 
 	if (questMap != NULL)
 		ObjectManager::instance()->destroyObjectFromDatabase(questMap->_getObjectID());
+}
+
+// BazaarBot item listing functionality
+// bazaarBotListItem(pBazaarBot, objectID, pBazzarTerminal, string description, int price)
+int DirectorManager::bazaarBotListItem(lua_State* L) {
+	Reference<CreatureObject*> player = (CreatureObject*)lua_touserdata(L, -5);
+	uint64 objectID = lua_tointeger(L, -4);
+	SceneObject* vendor = (SceneObject*) lua_touserdata(L, -3);
+	UnicodeString description = lua_tostring(L, -2);
+	int price = lua_tonumber(L, -1);
+	
+	AuctionManager* auctionManager = ServerCore::getZoneServer()->getAuctionManager();
+
+	if (auctionManager != NULL)
+		auctionManager->bazaarBotListItem(player, objectID, vendor, description, price);
+			
+	return 0;
+}
+
+// Create a crafted item and return its object (so BazaarBot can sell it)
+// bazaarBotMakeCraftedItem(pPlayer, ItemServerScriptPath, Quantity, Quality, AlternateTemplateNumber)
+int DirectorManager::bazaarBotMakeCraftedItem(lua_State* L) {
+	ManagedReference<CreatureObject*> creature = (CreatureObject*)lua_touserdata(L, -5);
+	String itemScript = lua_tostring(L, -4);
+	int quantity = lua_tonumber(L, -3);
+	int quality = lua_tonumber(L, -2);
+	int altTemplate = lua_tonumber(L, -1);
+	
+	quantity = MAX(1, quantity);
+	quality = MAX(1, quality);
+	
+	ManagedReference<CraftingManager*> craftingManager = creature->getZoneServer()->getCraftingManager();
+	
+	if (craftingManager == NULL) {
+		return 0;
+	}
+
+	ManagedReference<SceneObject*> inventory = creature->getSlottedObject("inventory");
+
+	if (inventory == NULL) {
+		Logger::console.info("BazaarBot: Error locating target inventory");
+		return 0;
+	}
+
+	try {
+		if (itemScript.indexOf("draft_schematic") == -1)
+			itemScript = "object/draft_schematic/" + itemScript;
+
+		if (itemScript.indexOf(".iff") == -1)
+			itemScript = itemScript + ".iff";
+
+		ManagedReference<DraftSchematic* > draftSchematic = creature->getZoneServer()->createObject(itemScript.hashCode(), 0).castTo<DraftSchematic*>();
+
+		if (draftSchematic == NULL || !draftSchematic->isValidDraftSchematic()) {
+			Logger::console.info("BazaarBot Error: Invalid draft schematic provided when attempt to make a crafted item");
+			throw Exception();
+		}
+
+		ManagedReference<ManufactureSchematic* > manuSchematic = ( draftSchematic->createManufactureSchematic()).castTo<ManufactureSchematic*>();
+
+		if (manuSchematic == NULL) {
+			Logger::console.info("BazaarBot: Error creating ManufactureSchematic from DraftSchematic");
+			throw Exception();
+		}
+
+		unsigned int targetTemplate = draftSchematic->getTanoCRC();
+
+		if (draftSchematic->getTemplateListSize() > 0) {
+			if (altTemplate >= draftSchematic->getTemplateListSize() || altTemplate < 0) {
+				Logger::console.info("BazaarBot Error: Invalid alternate crafting template requested");
+				throw Exception();
+			}
+
+			String requestedTemplate = draftSchematic->getTemplate(altTemplate);
+
+			String templateName = requestedTemplate.subString(0, requestedTemplate.lastIndexOf('/') + 1) + requestedTemplate.subString(requestedTemplate.lastIndexOf('/') + 8);
+
+			targetTemplate = templateName.hashCode();	
+		}
+
+		ManagedReference<TangibleObject *> prototype =  (creature->getZoneServer()->createObject(targetTemplate, 2)).castTo<TangibleObject*>();
+
+		if (prototype == NULL) {
+			Logger::console.info("BazaarBot Error: Unable to create crafted item");
+			throw Exception();
+		}
+
+		Locker locker(prototype);
+		Locker mlock(manuSchematic, prototype);
+
+		craftingManager->setInitialCraftingValues(prototype, manuSchematic, CraftingManager::GOODSUCCESS);
+
+		Reference<CraftingValues*> craftingValues = manuSchematic->getCraftingValues();
+		craftingValues->setManufactureSchematic(manuSchematic);
+		craftingValues->setPlayer(creature);
+
+		int nRows = craftingValues->getVisibleExperimentalPropertyTitleSize();
+
+		prototype->updateCraftingValues(craftingValues, true);
+	
+		for (int i = 0; i < nRows; i++) {
+			String title = craftingValues->getVisibleExperimentalPropertyTitle(i);
+			for (int j = 0; j < craftingValues->getExperimentalPropertySubtitleSize(); ++j) {
+				String subtitlesTitle = craftingValues->getExperimentalPropertySubtitlesTitle(j);
+				if (subtitlesTitle == title) {
+					String subtitle = craftingValues->getExperimentalPropertySubtitle(j);
+					float maxValue = craftingValues->getMaxValue(subtitle);
+					float minValue = craftingValues->getMinValue(subtitle);
+					
+					craftingValues->setCurrentPercentage(subtitle, (float)quality/100.f, 5.f);
+				}
+			}
+		}
+
+		craftingValues->recalculateValues(true);
+		prototype->updateCraftingValues(craftingValues, true);
+
+		mlock.release();
+
+		prototype->createChildObjects();
+
+		String name = "BazaarBot";
+		prototype->setCraftersName(name);
+
+		String serial = craftingManager->generateSerial();
+		prototype->setSerialNumber(serial);
+
+		prototype->updateToDatabase();
+
+		if (quantity > 1) {
+			ManagedReference<FactoryCrate* > crate = prototype->createFactoryCrate(true);
+
+			if (crate == NULL) {
+				prototype->destroyObjectFromDatabase(true);
+				throw Exception();
+			}
+
+			Locker cratelocker(crate);
+
+			crate->setUseCount(quantity);
+
+			if (!inventory->transferObject(crate, -1, true)) {
+				crate->destroyObjectFromDatabase(true);
+				throw Exception();
+			}
+
+			crate->sendTo(creature, true);
+			lua_pushlightuserdata(L, crate);
+
+		} else {
+			if (!inventory->transferObject(prototype, -1, true)) {
+				prototype->destroyObjectFromDatabase(true);
+				throw Exception();
+			}
+
+			prototype->sendTo(creature, true);
+			lua_pushlightuserdata(L, prototype);
+		}
+		
+		return 1;
+		
+	} catch (Exception& e) {
+		lua_pushnil(L);
+		return 0;
+	}
+}
+
+// Create a loot item and return its object 
+// bazaarBotMakeLootItem(pBazaarBot, string lootGroup, int level, bool maxCondition)
+int DirectorManager::bazaarBotMakeLootItem(lua_State* L) {
+	ManagedReference<CreatureObject*> creature = (CreatureObject*)lua_touserdata(L, -4);
+	String lootGroup = lua_tostring(L, -3);
+	int level = lua_tonumber(L, -2);
+	bool maxCondition = lua_toboolean(L, -1);
+	
+	ManagedReference<SceneObject*> inventory = creature->getSlottedObject("inventory");
+
+	if (inventory == NULL){
+		Logger::console.info("BazaarBot: Error locating target inventory");
+		return 0;
+	}
+	
+	LootManager* lootManager = ServerCore::getZoneServer()->getLootManager();
+	TangibleObject* loot = lootManager->bazaarBotCreateLoot(lootGroup, level, maxCondition);
+	
+	if (!inventory->transferObject(loot, -1, true)) {
+		loot->destroyObjectFromDatabase(true);
+		Logger::console.info("BazaarBot Error: Failed to put loot into target inventory");
+		return 0;
+	}
+	
+	lua_pushlightuserdata(L, loot);
+
+	return 1;
+}
+
+
+// Create a stack of resources
+// bazaarBotMakeResourceStack(pBazaarBot, string resourceName, quantity)
+int DirectorManager::bazaarBotMakeResources(lua_State* L) {
+	ManagedReference<CreatureObject*> creature = (CreatureObject*)lua_touserdata(L, -3);
+	String resourceString = lua_tostring(L, -2);
+	int quantity = lua_tonumber(L, -1);
+	
+	resourceString = resourceString.toLowerCase();
+	
+	ManagedReference<SceneObject*> inventory = creature->getSlottedObject("inventory");
+
+	if (inventory == NULL){
+		Logger::console.info("BazaarBot: Error locating target inventory");
+		return 0;
+	}
+	
+	ResourceManager* resourceManager = creature->getZoneServer()->getResourceManager();
+	
+	if (resourceManager == NULL){
+		Logger::console.info("BazaarBot: Error getting resource manager");
+		return 0;
+	}
+	
+	resourceManager->givePlayerResource(creature, resourceString, quantity);
+	
+	// Find the resource container we just put into BazaarBot's inventory
+	for (int i = 0; i < inventory->getContainerObjectsSize(); ++i) {
+		ManagedReference<SceneObject*> obj = inventory->getContainerObject(i);
+
+		if (obj == NULL || !obj->isResourceContainer())
+			continue;
+
+		ResourceContainer* resourceContainer = cast<ResourceContainer*>( obj.get());
+		
+		if (resourceContainer->getSpawnName().toLowerCase() == resourceString && resourceContainer->getQuantity() == quantity){
+			lua_pushlightuserdata(L, resourceContainer);
+			return 1;
+		}
+	}
+	
+	Logger::console.info("BazaarBot Error: Didn't find resource container in inventory");
+	return 0;
 }

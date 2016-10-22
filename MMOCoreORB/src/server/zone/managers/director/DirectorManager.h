@@ -187,6 +187,10 @@ namespace server {
 		static int getQuestVectorMap(lua_State* L);
 		static int removeQuestVectorMap(lua_State* L);
 		static int createQuestVectorMap(lua_State* L);
+		static int bazaarBotListItem(lua_State* L);
+		static int bazaarBotMakeCraftedItem(lua_State* L);
+		static int bazaarBotMakeLootItem(lua_State* L);
+		static int bazaarBotMakeResources(lua_State* L);
 
 	private:
 		void setupLuaPackagePath(Lua* luaEngine);
