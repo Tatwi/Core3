@@ -13,6 +13,8 @@
 --  bazaarBotListItem(pBazaarBot, itemObjectID, pBazzarTerminal, string description, int price, int duration in seconds, bool auction, bool premium)
 
 includeFile("bazaarbot/table_resources.lua")
+includeFile("bazaarbot/table_armor.lua")
+includeFile("bazaarbot/table_medicine.lua")
 
 BazaarBot = ScreenPlay:new {
 	numberOfActs = 1,
@@ -42,20 +44,22 @@ function BazaarBot:start()
 	-- Populate a new server's bazaar 
 	local init = getQuestStatus("BazaarBot:Initialized")
 	if (init == nil) then
-		createServerEvent(60*1000, "BazaarBot", "initializeResources", "BazaarBotInitResources")
+		createServerEvent(120*1000, "BazaarBot", "initializeResources", "BazaarBotInitResources")
 	end
 	
 	-- Schedule the lister events for after server has fully booted
-	createServerEvent(80*1000, "BazaarBot", "startEvents", "BazaarBotStartEvents")
+	createServerEvent(240*1000, "BazaarBot", "startEvents", "BazaarBotStartEvents")
 end
 
 function BazaarBot:startEvents()
 	self:addMoreResources()
+	self:addMoreArmor()
+	self:addMoreMedicine()
 end
 
 
 function BazaarBot:test(pPlayer, pObject)
-	BazaarBot:listResources()
+	BazaarBot:addMoreMedicine()
 	CreatureObject(pPlayer):sendSystemMessage("Test Complete!")
 end
 
@@ -121,6 +125,66 @@ function BazaarBot:listResources()
 	
 	printf("BazaarBot: Listed " .. tostring(self.resPerGen) .. " more resources.\n")
 end
+
+
+-- Crafted Item Functions
+
+function BazaarBot:addMoreArmor()
+	self:addMoreCraftedItems(BBArmorConfig, BBArmorItems)
+end
+
+function BazaarBot:addMoreMedicine()
+	self:addMoreCraftedItems(BBMedicineConfig, BBMedicineItems)
+end
+
+function BazaarBot:addMoreCraftedItems(configTable, itemTable)
+	self:listCraftedItems(configTable, itemTable)
+	
+	local nextTime = configTable.freq * 1000 + getRandomNumber(1,300000)
+	
+	if (hasServerEvent(configTable.eventName)) then
+		rescheduleServerEvent(configTable.eventName, nextTime)
+	else
+		createServerEvent(nextTime, "BazaarBot", configTable.functionName, configTable.eventName)
+	end
+end
+
+function BazaarBot:listCraftedItems(configTable, itemTable)
+	local pVendor = getSceneObject(self.terminalID)
+	local pBazaarBot = getCreatureObject(self.BazaarBotID)
+	
+	for i = 1, configTable.quantity do 
+		for j = 1, #itemTable do
+			local altTemplate = itemTable[j][2]
+			
+			for k = 3, #itemTable[j] do
+				local template = configTable.path .. itemTable[j][k]
+			
+				-- Determine item quality
+				local excellent = getRandomNumber(1, 100)
+				local minQuality = configTable.qualityMin
+				local maxQuality = configTable.qualityAvg
+				
+				if (excellent > 89) then
+					minQuality = configTable.qualityAvg
+					maxQuality = configTable.qualityMax
+				elseif (excellent > 99) then
+					minQuality = configTable.qualityMax + 1
+					maxQuality = configTable.qualityMax + 5
+				end
+			
+				local quality = getRandomNumber(minQuality,maxQuality)
+				local price = itemTable[j][1] * ((quality/200) + 1) * configTable.crateQuantity
+				
+				local pItem = bazaarBotMakeCraftedItem(pBazaarBot, template, configTable.crateQuantity, quality, altTemplate)
+				local itemForSaleObjectID = SceneObject(pItem):getObjectID()
+				
+				bazaarBotListItem(pBazaarBot, itemForSaleObjectID, pVendor, self.itemDescription, price)
+			end
+		end
+	end
+end
+
 
 
 function BazaarBot:testLootItem(pPlayer, pObject)

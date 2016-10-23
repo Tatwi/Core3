@@ -3328,6 +3328,10 @@ int DirectorManager::bazaarBotMakeCraftedItem(lua_State* L) {
 			Locker cratelocker(crate);
 
 			crate->setUseCount(quantity);
+			
+			StringBuffer customName;
+			customName << prototype->getDisplayedName() <<  " [" << quantity << "]";
+			crate->setCustomObjectName(customName.toString(), false);
 
 			if (!inventory->transferObject(crate, -1, true)) {
 				crate->destroyObjectFromDatabase(true);
