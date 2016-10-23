@@ -17,10 +17,18 @@ includeFile("bazaarbot/table_resources.lua")
 BazaarBot = ScreenPlay:new {
 	numberOfActs = 1,
 	BazaarBotID = 281474993877563, -- Make a character named BazaarBot and put its PlayerID number here (/getPlayerID BazaarBot).
+	terminalID = 3945376, -- Mos Entha, Tatooine
+	itemDescription = "Brought to you by Bazaarbot!", -- Optional message in the description window.
+	-- Resource Config
+	resListingsInit = 100, -- number of listings to start a new server with: resListingsInit * resPerGen
+	resGenFreq = 25, -- how often to generate a listing, minutes + random seconds upto 5 minutes
+	resPerGen = 2, -- how many resource types per listing
+	resStackSizes = {1000, 5000, 10000},
+	resStacks = 2, -- how many stacks to list per stack size
+	creditsPerUnit = 3, -- Price of resource is stack size * credits per unit
 }
 
 registerScreenPlay("BazaarBot", true)
-
 
 function BazaarBot:start()
 	-- Testing trigger object
@@ -30,11 +38,53 @@ function BazaarBot:start()
 		SceneObject(pTerminal):setObjectMenuComponent("ABTestMenuComponent")
 		SceneObject(pTerminal):setCustomObjectName("BazaarBot Trigger")
 	end
+	
+	-- Populate a new server's bazaar 
+	local init = getQuestStatus("BazaarBot:Initialized")
+	if (init == nil) then
+		createServerEvent(60*1000, "BazaarBot", "initializeResources", "BazaarBotInitResources")
+	end
+	
+	-- Schedule the lister events for after server has fully booted
+	createServerEvent(80*1000, "BazaarBot", "startEvents", "BazaarBotStartEvents")
+end
+
+function BazaarBot:startEvents()
+	self:addMoreResources()
+end
+
+
+function BazaarBot:test(pPlayer, pObject)
+	BazaarBot:listResources()
+	CreatureObject(pPlayer):sendSystemMessage("Test Complete!")
+end
+
+
+-- Resource Functions
+
+function BazaarBot:initializeResources()
+	printf("BazaarBot: Populating bazaar with resources for the first time...\n")
+	for i = 1, self.resListingsInit do
+		self:listResources()
+	end
+	setQuestStatus("BazaarBot:Initialized", 1)
+	printf("BazaarBot: Initialized " .. tostring(self.resListingsInit * self.resPerGen * #self.resStackSizes * self.resStacks) .. " bazaar listings in " .. tostring(self.resListingsInit * self.resPerGen) .. " random resource selection cycles.\n")
+end
+
+function BazaarBot:addMoreResources()
+	self:listResources()
+	
+	local nextTime = self.resGenFreq * 60*1000 + getRandomNumber(1,300000)
+	
+	if (hasServerEvent("BazaarBotAddResources")) then
+		rescheduleServerEvent("BazaarBotAddResources", nextTime)
+	else
+		createServerEvent(nextTime, "BazaarBot", "addMoreResources", "BazaarBotAddResources")
+	end
 end
 
 function BazaarBot:pickResource()
 	local resourceName = nil
-	local retryCount = 0
 	
 	while (resourceName == nil) do
 		-- Pick a family
@@ -46,35 +96,30 @@ function BazaarBot:pickResource()
 		local rand = getRandomNumber(1,#BBResCats[familyName])
 		local resourceCategory = BBResCats[familyName][rand]
 		resourceName = getRandomInSpawnResource(resourceCategory)
-		retryCount = retryCount + 1
-	end
-	
-	if retryCount > 0 then
-		printf("BazaarBot: Resource Picker tried again " .. tostring(retryCount) .. " times.\n")
 	end
 	
 	return resourceName
 end
 
-
-function BazaarBot:test(pPlayer, pObject)
-	local pVendor = getSceneObject(3945376)
-	local description = "This item is for sale!"
-	local price = 250
-	local pBazaarBot = getCreatureObject(281474993877563)
+function BazaarBot:listResources()
+	local pVendor = getSceneObject(self.terminalID)
+	local pBazaarBot = getCreatureObject(self.BazaarBotID)
 	
-	for i = 1, 100 do 
-	
+	for i = 1, self.resPerGen do -- x number of resources
 		local resourceName = self:pickResource()
 		
-		local pItem = bazaarBotMakeResources(pBazaarBot, resourceName, 1000)
-		local itemForSaleObjectID = SceneObject(pItem):getObjectID()
-		
-		bazaarBotListItem(pBazaarBot, itemForSaleObjectID, pVendor, description, price)
-	
+		for j = 1, #self.resStackSizes do -- x number of stack sizes
+			for k = 1, self.resStacks do -- x number of stacks
+				local pItem = bazaarBotMakeResources(pBazaarBot, resourceName, self.resStackSizes[j])
+				local itemForSaleObjectID = SceneObject(pItem):getObjectID()
+				local price = self.resStackSizes[j] * self.creditsPerUnit
+				
+				bazaarBotListItem(pBazaarBot, itemForSaleObjectID, pVendor, self.itemDescription, price)
+			end
+		end
 	end
 	
-	CreatureObject(pPlayer):sendSystemMessage("Test Complete!")
+	printf("BazaarBot: Listed " .. tostring(self.resPerGen) .. " more resources.\n")
 end
 
 
