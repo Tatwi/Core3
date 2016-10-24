@@ -15,6 +15,7 @@
 includeFile("bazaarbot/table_resources.lua")
 includeFile("bazaarbot/table_armor.lua")
 includeFile("bazaarbot/table_medicine.lua")
+includeFile("bazaarbot/table_food.lua")
 
 BazaarBot = ScreenPlay:new {
 	numberOfActs = 1,
@@ -55,11 +56,12 @@ function BazaarBot:startEvents()
 	self:addMoreResources()
 	self:addMoreArmor()
 	self:addMoreMedicine()
+	self:addMoreFood()
 end
 
 
 function BazaarBot:test(pPlayer, pObject)
-	BazaarBot:addMoreMedicine()
+	BazaarBot:addMoreFood()
 	CreatureObject(pPlayer):sendSystemMessage("Test Complete!")
 end
 
@@ -135,6 +137,10 @@ end
 
 function BazaarBot:addMoreMedicine()
 	self:addMoreCraftedItems(BBMedicineConfig, BBMedicineItems)
+end
+
+function BazaarBot:addMoreFood()
+	self:addMoreCraftedItems(BBFoodConfig, BBMFoodItems)
 end
 
 function BazaarBot:addMoreCraftedItems(configTable, itemTable)
