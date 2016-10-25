@@ -3194,7 +3194,7 @@ void DirectorManager::removeQuestVectorMap(const String& keyString) {
 // bazaarBotListItem(pBazaarBot, objectID, pBazzarTerminal, string description, int price)
 int DirectorManager::bazaarBotListItem(lua_State* L) {
 	Reference<CreatureObject*> player = (CreatureObject*)lua_touserdata(L, -5);
-	uint64 objectID = lua_tointeger(L, -4);
+	Reference<SceneObject*> itemToSell = (SceneObject*)lua_touserdata(L, -4);
 	SceneObject* vendor = (SceneObject*) lua_touserdata(L, -3);
 	UnicodeString description = lua_tostring(L, -2);
 	int price = lua_tonumber(L, -1);
@@ -3202,7 +3202,7 @@ int DirectorManager::bazaarBotListItem(lua_State* L) {
 	AuctionManager* auctionManager = ServerCore::getZoneServer()->getAuctionManager();
 
 	if (auctionManager != NULL)
-		auctionManager->bazaarBotListItem(player, objectID, vendor, description, price);
+		auctionManager->bazaarBotListItem(player, itemToSell, vendor, description, price);
 			
 	return 0;
 }
@@ -3233,11 +3233,6 @@ int DirectorManager::bazaarBotMakeCraftedItem(lua_State* L) {
 	}
 
 	try {
-		if (itemScript.indexOf("draft_schematic") == -1)
-			itemScript = "object/draft_schematic/" + itemScript;
-
-		if (itemScript.indexOf(".iff") == -1)
-			itemScript = itemScript + ".iff";
 
 		ManagedReference<DraftSchematic* > draftSchematic = creature->getZoneServer()->createObject(itemScript.hashCode(), 0).castTo<DraftSchematic*>();
 

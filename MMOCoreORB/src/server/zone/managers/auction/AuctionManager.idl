@@ -154,7 +154,7 @@ class AuctionManager extends ManagedService implements Logger {
 	}
 	
 	@local
-	public native void bazaarBotListItem(CreatureObject player, unsigned long objectid, SceneObject vendor, final unicode description, int price);
+	public native void bazaarBotListItem(CreatureObject player, SceneObject objectToSell, SceneObject vendor, final unicode description, int price);
 	
 }
 

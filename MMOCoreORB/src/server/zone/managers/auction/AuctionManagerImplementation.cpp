@@ -1799,7 +1799,7 @@ String AuctionManagerImplementation::removeColorCodes(const String& name) {
 }
 
 // BazaarBot item listing functionality
-void AuctionManagerImplementation::bazaarBotListItem(CreatureObject* player, uint64 objectid, SceneObject* vendor, const UnicodeString& description, int price) {
+void AuctionManagerImplementation::bazaarBotListItem(CreatureObject* player, SceneObject* objectToSell, SceneObject* vendor, const UnicodeString& description, int price) {
 
 	if (!vendor->isBazaarTerminal()) {
 		error("BazaarBot: Vendor was not a valid Bazaar Terminal object");
@@ -1812,12 +1812,21 @@ void AuctionManagerImplementation::bazaarBotListItem(CreatureObject* player, uin
 		zoneServer->getPlayerManager()->handleAbortTradeMessage(player);
 	}
 
-	ManagedReference<SceneObject*> objectToSell = zoneServer->getObject(objectid);
 	String vendorUID = getVendorUID(vendor);
 	bool stockroomSale = false;
 
-	if (objectToSell == NULL || objectToSell->isNoTrade() || objectToSell->containsNoTradeObjectRecursive()) {
-		error("BazaarBot: Generated object was NULL, No-Trade, or contains child objects");
+	if (objectToSell == NULL) {
+		error("BazaarBot: Unable to list a NULL object");
+		return;
+	}
+	
+	if (objectToSell->isNoTrade()) {
+		error("BazaarBot: Unable to list a No-Trade object");
+		return;
+	}
+	
+	if (objectToSell->containsNoTradeObjectRecursive()) {
+		error("BazaarBot: Unable to list a container that cotains a No-Trade item");
 		return;
 	}
 
@@ -1837,7 +1846,7 @@ void AuctionManagerImplementation::bazaarBotListItem(CreatureObject* player, uin
 	bool auction = false;
 	bool premium = false;
 
-	ManagedReference<AuctionItem*> item = createVendorItem(player, objectToSell.get(), vendor, description, price, duration, auction, premium);
+	ManagedReference<AuctionItem*> item = createVendorItem(player, objectToSell, vendor, description, price, duration, auction, premium);
 
 	if(item == NULL) {
 		error("BazaarBot: createVendorItem returned NULL object");

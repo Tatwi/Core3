@@ -16,6 +16,7 @@ includeFile("bazaarbot/table_resources.lua")
 includeFile("bazaarbot/table_armor.lua")
 includeFile("bazaarbot/table_medicine.lua")
 includeFile("bazaarbot/table_food.lua")
+includeFile("bazaarbot/table_weapons.lua")
 
 BazaarBot = ScreenPlay:new {
 	numberOfActs = 1,
@@ -57,11 +58,12 @@ function BazaarBot:startEvents()
 	self:addMoreArmor()
 	self:addMoreMedicine()
 	self:addMoreFood()
+	--self:addMoreWeapons()
 end
 
 
 function BazaarBot:test(pPlayer, pObject)
-	BazaarBot:addMoreFood()
+	BazaarBot:addMoreWeapons()
 	CreatureObject(pPlayer):sendSystemMessage("Test Complete!")
 end
 
@@ -143,6 +145,10 @@ function BazaarBot:addMoreFood()
 	self:addMoreCraftedItems(BBFoodConfig, BBMFoodItems)
 end
 
+function BazaarBot:addMoreWeapons()
+	self:addMoreCraftedItems(BBWeaponsConfig, BBWeaponsItems)
+end
+
 function BazaarBot:addMoreCraftedItems(configTable, itemTable)
 	self:listCraftedItems(configTable, itemTable)
 	
@@ -164,7 +170,7 @@ function BazaarBot:listCraftedItems(configTable, itemTable)
 			local altTemplate = itemTable[j][2]
 			
 			for k = 3, #itemTable[j] do
-				local template = configTable.path .. itemTable[j][k]
+				local template = configTable.path .. itemTable[j][k] .. ".iff"
 			
 				-- Determine item quality
 				local excellent = getRandomNumber(1, 100)
@@ -183,9 +189,12 @@ function BazaarBot:listCraftedItems(configTable, itemTable)
 				local price = itemTable[j][1] * ((quality/200) + 1) * configTable.crateQuantity
 				
 				local pItem = bazaarBotMakeCraftedItem(pBazaarBot, template, configTable.crateQuantity, quality, altTemplate)
-				local itemForSaleObjectID = SceneObject(pItem):getObjectID()
 				
-				bazaarBotListItem(pBazaarBot, itemForSaleObjectID, pVendor, self.itemDescription, price)
+				if not (pItem == nil) then
+					bazaarBotListItem(pBazaarBot, pItem, pVendor, self.itemDescription, price)
+				else
+					printf("BazaarBot: Error creating  " .. template .. "\n")
+				end
 			end
 		end
 	end
