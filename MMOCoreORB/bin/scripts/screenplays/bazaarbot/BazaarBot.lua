@@ -17,6 +17,7 @@ includeFile("bazaarbot/table_armor.lua")
 includeFile("bazaarbot/table_medicine.lua")
 includeFile("bazaarbot/table_food.lua")
 includeFile("bazaarbot/table_weapons.lua")
+includeFile("bazaarbot/table_item_artisan.lua")
 
 BazaarBot = ScreenPlay:new {
 	numberOfActs = 1,
@@ -58,12 +59,12 @@ function BazaarBot:startEvents()
 	self:addMoreArmor()
 	self:addMoreMedicine()
 	self:addMoreFood()
-	--self:addMoreWeapons()
+	self:addMoreWeapons()
 end
 
 
 function BazaarBot:test(pPlayer, pObject)
-	BazaarBot:addMoreWeapons()
+	BazaarBot:addMoreArtisanItems()
 	CreatureObject(pPlayer):sendSystemMessage("Test Complete!")
 end
 
@@ -149,6 +150,10 @@ function BazaarBot:addMoreWeapons()
 	self:addMoreCraftedItems(BBWeaponsConfig, BBWeaponsItems)
 end
 
+function BazaarBot:addMoreArtisanItems()
+	self:addMoreCraftedItems(BBArtisanConfig, BBArtisanItems)
+end
+
 function BazaarBot:addMoreCraftedItems(configTable, itemTable)
 	self:listCraftedItems(configTable, itemTable)
 	
@@ -165,12 +170,13 @@ function BazaarBot:listCraftedItems(configTable, itemTable)
 	local pVendor = getSceneObject(self.terminalID)
 	local pBazaarBot = getCreatureObject(self.BazaarBotID)
 	
-	for i = 1, configTable.quantity do 
-		for j = 1, #itemTable do
-			local altTemplate = itemTable[j][2]
-			
-			for k = 3, #itemTable[j] do
+	 
+	for j = 1, #itemTable do
+		for i = 1, itemTable[j][2] do -- quantity
+			for k = 5, #itemTable[j] do -- items in each group/index
 				local template = configTable.path .. itemTable[j][k] .. ".iff"
+				local altTemplate = itemTable[j][4]
+				local crateQuantity = itemTable[j][3]
 			
 				-- Determine item quality
 				local excellent = getRandomNumber(1, 100)
@@ -186,9 +192,9 @@ function BazaarBot:listCraftedItems(configTable, itemTable)
 				end
 			
 				local quality = getRandomNumber(minQuality,maxQuality)
-				local price = itemTable[j][1] * ((quality/200) + 1) * configTable.crateQuantity
+				local price = itemTable[j][1] * ((quality/200) + 1) * crateQuantity
 				
-				local pItem = bazaarBotMakeCraftedItem(pBazaarBot, template, configTable.crateQuantity, quality, altTemplate)
+				local pItem = bazaarBotMakeCraftedItem(pBazaarBot, template, crateQuantity, quality, altTemplate)
 				
 				if not (pItem == nil) then
 					bazaarBotListItem(pBazaarBot, pItem, pVendor, self.itemDescription, price)
