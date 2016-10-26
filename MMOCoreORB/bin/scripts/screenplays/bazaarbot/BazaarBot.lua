@@ -18,14 +18,17 @@ includeFile("bazaarbot/table_medicine.lua")
 includeFile("bazaarbot/table_food.lua")
 includeFile("bazaarbot/table_weapons.lua")
 includeFile("bazaarbot/table_item_artisan.lua")
+includeFile("bazaarbot/table_structures.lua")
+includeFile("bazaarbot/table_loot.lua")
 
 BazaarBot = ScreenPlay:new {
 	numberOfActs = 1,
 	BazaarBotID = 281474993877563, -- Make a character named BazaarBot and put its PlayerID number here (/getPlayerID BazaarBot).
 	terminalID = 3945376, -- Mos Entha, Tatooine
-	itemDescription = "Brought to you by Bazaarbot!", -- Optional message in the description window.
+	itemDescription = "", -- Optional message in the description window.
+	ListingsInit = 30, -- On first boot after this system is installed, the server will loop this many times through the add functions
 	-- Resource Config
-	resListingsInit = 100, -- number of listings to start a new server with: resListingsInit * resPerGen
+	
 	resGenFreq = 25, -- how often to generate a listing, minutes + random seconds upto 5 minutes
 	resPerGen = 2, -- how many resource types per listing
 	resStackSizes = {1000, 5000, 10000},
@@ -36,18 +39,20 @@ BazaarBot = ScreenPlay:new {
 registerScreenPlay("BazaarBot", true)
 
 function BazaarBot:start()
-	-- Testing trigger object
-	local pTerminal = spawnSceneObject("tatooine", "object/tangible/furniture/decorative/foodcart.iff" , 1591, 7, 3031, 0, 0, 0, 0, 0)
-	if (pTerminal ~= nil) then
-		-- Add menu and custom name
-		SceneObject(pTerminal):setObjectMenuComponent("ABTestMenuComponent")
-		SceneObject(pTerminal):setCustomObjectName("BazaarBot Trigger")
+	local pBazaarBot = getCreatureObject(self.BazaarBotID)
+	
+	if (pBazaarBot == nil) then
+		printf("ERROR: BazaarBot character does not exist! Please create it on an ADMIN ACCOUNT and configure bin/screenplays/BazaarBot.lua to use the system.")
+		return
 	end
+
+	-- Testing trigger object
+	self:loadTestingObject()
 	
 	-- Populate a new server's bazaar 
 	local init = getQuestStatus("BazaarBot:Initialized")
 	if (init == nil) then
-		createServerEvent(120*1000, "BazaarBot", "initializeResources", "BazaarBotInitResources")
+		createServerEvent(120*1000, "BazaarBot", "initializeListings", "BazaarBotInitializeListings")
 	end
 	
 	-- Schedule the lister events for after server has fully booted
@@ -60,27 +65,63 @@ function BazaarBot:startEvents()
 	self:addMoreMedicine()
 	self:addMoreFood()
 	self:addMoreWeapons()
+	self:addMoreArtisanItems()
+	self:addMoreStructures()
+	self:addMoreLoot()
+	printf("BazaarBot: All listing events have now started and will repeat on their own periodically.\n")
 end
 
-
-function BazaarBot:test(pPlayer, pObject)
-	BazaarBot:addMoreArtisanItems()
-	CreatureObject(pPlayer):sendSystemMessage("Test Complete!")
+function BazaarBot:initializeListings()
+	printf("BazaarBot: Populating bazaar with items and resources for the first time...\n")
+	for i = 1, self.resListingsInit do
+		self:addMoreResources()
+		self:addMoreArmor()
+		self:addMoreMedicine()
+		self:addMoreFood()
+		self:addMoreWeapons()
+		self:addMoreArtisanItems()
+		self:addMoreStructures()
+		self:addMoreLoot()
+	end
+	setQuestStatus("BazaarBot:Initialized", 1)
+	printf("BazaarBot: Initialized!\n")
 end
 
+-- A full inventory will prevent the creation and listing of new items
+function BazaarBot:cleanInventory()
+	local pBazaarBot = getCreatureObject(self.BazaarBotID)
+	local pInventory = CreatureObject(pBazaarBot):getSlottedObject("inventory")
+	local itemInInventory = math.tointeger(SceneObject(pInventory):getContainerObjectsSize())
+	
+	if (itemInInventory == 0) then
+		return
+	end
+
+	printf("BazaarBot: Removing " .. tostring(itemInInventory) .. " items from my inventory...\n")
+	
+	while (itemInInventory > 0) do
+		local pItem = SceneObject(pInventory):getContainerObject(i)
+		
+		SceneObject(pItem):destroyObjectFromWorld()
+		SceneObject(pItem):destroyObjectFromDatabase()
+		
+		itemInInventory = math.tointeger(SceneObject(pInventory):getContainerObjectsSize())
+	end
+	
+	printf("BazaarBot: Done!\n")
+end
+
+function BazaarBot:logListing(message)
+	local outputFile = io.open("log/bazaarbot_listings.log", "a")
+	io.output(outputFile)
+	io.write(os.date("%x %X") .. " " .. message .. "\n")
+	io.close(outputFile)
+end
 
 -- Resource Functions
 
-function BazaarBot:initializeResources()
-	printf("BazaarBot: Populating bazaar with resources for the first time...\n")
-	for i = 1, self.resListingsInit do
-		self:listResources()
-	end
-	setQuestStatus("BazaarBot:Initialized", 1)
-	printf("BazaarBot: Initialized " .. tostring(self.resListingsInit * self.resPerGen * #self.resStackSizes * self.resStacks) .. " bazaar listings in " .. tostring(self.resListingsInit * self.resPerGen) .. " random resource selection cycles.\n")
-end
-
 function BazaarBot:addMoreResources()
+	self:cleanInventory()
 	self:listResources()
 	
 	local nextTime = self.resGenFreq * 60*1000 + getRandomNumber(1,300000)
@@ -113,22 +154,33 @@ end
 function BazaarBot:listResources()
 	local pVendor = getSceneObject(self.terminalID)
 	local pBazaarBot = getCreatureObject(self.BazaarBotID)
+	local loggingNames = ""
 	
 	for i = 1, self.resPerGen do -- x number of resources
 		local resourceName = self:pickResource()
+		local listedOK = false
 		
 		for j = 1, #self.resStackSizes do -- x number of stack sizes
 			for k = 1, self.resStacks do -- x number of stacks
 				local pItem = bazaarBotMakeResources(pBazaarBot, resourceName, self.resStackSizes[j])
-				local itemForSaleObjectID = SceneObject(pItem):getObjectID()
 				local price = self.resStackSizes[j] * self.creditsPerUnit
 				
-				bazaarBotListItem(pBazaarBot, itemForSaleObjectID, pVendor, self.itemDescription, price)
+				if (pItem ~= nil) then
+					bazaarBotListItem(pBazaarBot, pItem, pVendor, self.itemDescription, price)
+					listedOK = true
+				else
+					printf("BazaarBot: Failed to generate a stack of resource using the following name: " .. resourceName .. "\n")
+				end
 			end
+		end
+		
+		if (listedOK == true) then
+			self:logListing("R: " .. resourceName .. " " .. tostring(#self.resStackSizes * self.resStacks) .. " stacks")
+		else
+			self:logListing("R: " .. resourceName .. " Failed")
 		end
 	end
 	
-	printf("BazaarBot: Listed " .. tostring(self.resPerGen) .. " more resources.\n")
 end
 
 
@@ -154,7 +206,12 @@ function BazaarBot:addMoreArtisanItems()
 	self:addMoreCraftedItems(BBArtisanConfig, BBArtisanItems)
 end
 
+function BazaarBot:addMoreStructures()
+	self:addMoreCraftedItems(BBStructuresConfig, BBStructuresItems)
+end
+
 function BazaarBot:addMoreCraftedItems(configTable, itemTable)
+	self:cleanInventory()
 	self:listCraftedItems(configTable, itemTable)
 	
 	local nextTime = configTable.freq * 1000 + getRandomNumber(1,300000)
@@ -169,8 +226,8 @@ end
 function BazaarBot:listCraftedItems(configTable, itemTable)
 	local pVendor = getSceneObject(self.terminalID)
 	local pBazaarBot = getCreatureObject(self.BazaarBotID)
+	local listedOK = false
 	
-	 
 	for j = 1, #itemTable do
 		for i = 1, itemTable[j][2] do -- quantity
 			for k = 5, #itemTable[j] do -- items in each group/index
@@ -196,48 +253,93 @@ function BazaarBot:listCraftedItems(configTable, itemTable)
 				
 				local pItem = bazaarBotMakeCraftedItem(pBazaarBot, template, crateQuantity, quality, altTemplate)
 				
-				if not (pItem == nil) then
+				if (pItem ~= nil) then
 					bazaarBotListItem(pBazaarBot, pItem, pVendor, self.itemDescription, price)
 				else
-					printf("BazaarBot: Error creating  " .. template .. "\n")
+					self:logListing("C: " .. configTable.functionName .. "() Failed: " .. template)
+					return
 				end
 			end
+		end
+	end
+	
+	self:logListing("C: " .. configTable.functionName .. "() OK")
+end
+
+
+-- Loot functions
+
+function BazaarBot:addMoreLoot()
+	self:cleanInventory()
+	-- Schedule Event
+	local nextTime = BBLootConfig.freq * 1000 + getRandomNumber(1,300000)
+	
+	if (hasServerEvent(BBLootConfig.eventName)) then
+		rescheduleServerEvent(BBLootConfig.eventName, nextTime)
+	else
+		createServerEvent(nextTime, "BazaarBot", BBLootConfig.functionName, BBLootConfig.eventName)
+	end
+
+	-- Create and list the loot
+	local pVendor = getSceneObject(self.terminalID)
+	local pBazaarBot = getCreatureObject(self.BazaarBotID)
+	
+	for i = 1, BBLootConfig.quantity do
+		local roll = getRandomNumber(1,100)
+		local lootGroup = 1 -- Common
+		
+		if (roll > 95) then
+			lootGroup = 3 -- Very Rare
+		elseif (roll > 70) then
+			lootGroup = 2 -- Rare
+		end
+	
+		local lootName = BBLootItems[lootGroup][getRandomNumber(1,#BBLootItems[lootGroup])]
+		local lootLevel = getRandomNumber(BBLootConfig.minLevel,BBLootConfig.maxLevel)
+		 
+		local pItem = bazaarBotMakeLootItem(pBazaarBot, lootName, lootLevel, false)
+	
+		if (pItem ~= nil) then
+			local price = TangibleObject(pItem):getJunkValue()
+			
+			if (price == nil) then
+				price = 2000 + getRandomNumber(1,2000) + lootLevel
+			else
+				price = price * 2 + getRandomNumber(1,100) + lootLevel
+			end
+		
+			bazaarBotListItem(pBazaarBot, pItem, pVendor, self.itemDescription, price)
+			self:logListing("L: " .. SceneObject(pItem):getObjectName() .. " (" .. tostring(lootLevel) .. ") " .. tostring(price) .. "cr")
+		else
+			self:logListing("L: " .. lootName .. " (" .. tostring(lootLevel) .. ") Failed")
 		end
 	end
 end
 
 
+-- Testing
 
-function BazaarBot:testLootItem(pPlayer, pObject)
-	local pVendor = getSceneObject(3945376)
-	local description = "This item is for sale!"
-	local price = 250
-	local pBazaarBot = getCreatureObject(281474993877563)
-	
-	local pItem = bazaarBotMakeLootItem(pBazaarBot, "weapons_all", 35, false)
-	local itemForSaleObjectID = SceneObject(pItem):getObjectID()
-	
-	bazaarBotListItem(pBazaarBot, itemForSaleObjectID, pVendor, description, price)
-	
+function BazaarBot:test(pPlayer, pObject)
+	self:addMoreResources()
+	self:addMoreArmor()
+	self:addMoreMedicine()
+	self:addMoreFood()
+	self:addMoreWeapons()
+	self:addMoreArtisanItems()
+	self:addMoreStructures()
+	self:addMoreLoot()
 	CreatureObject(pPlayer):sendSystemMessage("Test Complete!")
 end
 
-
-function BazaarBot:testCraftedItem(pPlayer, pObject)
-	local pVendor = getSceneObject(3945376)
-	local description = "This item is for sale!"
-	local price = 25000
-	local pBazaarBot = getCreatureObject(281474993877563)
+function BazaarBot:loadTestingObject()
+	local pTerminal = spawnSceneObject("tatooine", "object/tangible/furniture/decorative/foodcart.iff" , 1591, 7, 3031, 0, 0, 0, 0, 0)
 	
-	local pItem = bazaarBotMakeCraftedItem(pPlayer, "object/draft_schematic/clothing/clothing_backpack_field_01.iff", 1, 75, 0)
-	local itemForSaleObjectID = SceneObject(pItem):getObjectID()
-	
-	bazaarBotListItem(pBazaarBot, itemForSaleObjectID, pVendor, description, price)
-	
-	CreatureObject(pPlayer):sendSystemMessage("Test Complete!")
+	if (pTerminal ~= nil) then
+		-- Add menu and custom name
+		SceneObject(pTerminal):setObjectMenuComponent("ABTestMenuComponent")
+		SceneObject(pTerminal):setCustomObjectName("BazaarBot Trigger")
+	end
 end
-
--- Testing Trigger
 
 ABTestMenuComponent = { }
 

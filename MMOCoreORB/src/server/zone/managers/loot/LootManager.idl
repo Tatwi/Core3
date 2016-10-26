@@ -189,5 +189,5 @@ class LootManager extends ManagedService implements Logger {
 	}
 
 	@local
-	public native TangibleObject bazaarBotCreateLoot(final string lootGroup, int level = -1, boolean maxCondition = false);
+	public native TangibleObject bazaarBotCreateLoot(final string lootItem, int level = -1, boolean maxCondition = false);
 }

@@ -1821,35 +1821,38 @@ void AuctionManagerImplementation::bazaarBotListItem(CreatureObject* player, Sce
 	}
 	
 	if (objectToSell->isNoTrade()) {
-		error("BazaarBot: Unable to list a No-Trade object");
+		error("BazaarBot: Unable to list a No-Trade object " + objectToSell->getDisplayedName() + ". The object was deleted.");
 		return;
 	}
 	
 	if (objectToSell->containsNoTradeObjectRecursive()) {
-		error("BazaarBot: Unable to list a container that cotains a No-Trade item");
+		objectToSell->destroyObjectFromWorld(true);
+		error("BazaarBot: Unable to list a container that cotains a No-Trade item "+ objectToSell->getDisplayedName() + ". The object was deleted.");
 		return;
 	}
 
 	ManagedReference<Zone*> zone = vendor->getZone();
 	if (zone == NULL) {
-		error("BazaarBot: The zone containing the vendor was not found");
+		objectToSell->destroyObjectFromWorld(true);
+		error("BazaarBot: The zone containing the vendor was not found. Object not listed and deleted");
 		return;
 	}
 
 	if(auctionMap->containsItem(objectToSell->getObjectID())) {
-		error("BazaarBot: Attempted to sell item that was already for sale");
+		error("BazaarBot: Attempted to sell item that was already for sale " + objectToSell->getDisplayedName());
 		return;
 	}
 	
 	// Set some values used by createVendorItem
-	uint32 duration = 604800; // 7 days in seconds
+	uint32 duration = AuctionManager::COMMODITYEXPIREPERIOD; // Default is 7 days (in seconds)
 	bool auction = false;
 	bool premium = false;
 
 	ManagedReference<AuctionItem*> item = createVendorItem(player, objectToSell, vendor, description, price, duration, auction, premium);
 
 	if(item == NULL) {
-		error("BazaarBot: createVendorItem returned NULL object");
+		objectToSell->destroyObjectFromWorld(true);
+		error("BazaarBot: createVendorItem returned NULL object when trying to list " + objectToSell->getDisplayedName() + ". The object was deleted.");
 		return;
 	}
 
@@ -1858,7 +1861,7 @@ void AuctionManagerImplementation::bazaarBotListItem(CreatureObject* player, Sce
 	int result = auctionMap->addItem(player, vendor, item);
 
 	if(result != ItemSoldMessage::SUCCESS) {
-		error("BazaarBot: Item was not successfully listed");
+		error("BazaarBot: Item was not successfully listed... ");
 		auctionMap->removeFromCommodityLimit(item);
 		return;
 	}
@@ -1870,12 +1873,4 @@ void AuctionManagerImplementation::bazaarBotListItem(CreatureObject* player, Sce
 	objectToSellLocker.release();
 
 	item->setPersistent(1);
-
-	if(item->isAuction()) {
-		Reference<Task*> newTask = new ExpireAuctionTask(_this.getReferenceUnsafeStaticCast(), item);
-		newTask->schedule((item->getExpireTime() - time(0)) * 1000);
-
-		Locker locker(&auctionEvents);
-		auctionEvents.put(item->getAuctionedItemObjectID(), newTask);
-	}
 }

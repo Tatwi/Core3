@@ -3358,7 +3358,7 @@ int DirectorManager::bazaarBotMakeCraftedItem(lua_State* L) {
 // bazaarBotMakeLootItem(pBazaarBot, string lootGroup, int level, bool maxCondition)
 int DirectorManager::bazaarBotMakeLootItem(lua_State* L) {
 	ManagedReference<CreatureObject*> creature = (CreatureObject*)lua_touserdata(L, -4);
-	String lootGroup = lua_tostring(L, -3);
+	String lootItem = lua_tostring(L, -3);
 	int level = lua_tonumber(L, -2);
 	bool maxCondition = lua_toboolean(L, -1);
 	
@@ -3370,7 +3370,7 @@ int DirectorManager::bazaarBotMakeLootItem(lua_State* L) {
 	}
 	
 	LootManager* lootManager = ServerCore::getZoneServer()->getLootManager();
-	TangibleObject* loot = lootManager->bazaarBotCreateLoot(lootGroup, level, maxCondition);
+	TangibleObject* loot = lootManager->bazaarBotCreateLoot(lootItem, level, maxCondition);
 	
 	if (!inventory->transferObject(loot, -1, true)) {
 		loot->destroyObjectFromDatabase(true);
