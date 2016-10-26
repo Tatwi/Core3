@@ -355,6 +355,7 @@ void DirectorManager::initializeLuaEngine(Lua* luaEngine) {
 	lua_register(luaEngine->getLuaState(), "bazaarBotMakeLootItem", bazaarBotMakeLootItem);
 	lua_register(luaEngine->getLuaState(), "bazaarBotMakeResources", bazaarBotMakeResources);
 	lua_register(luaEngine->getLuaState(), "getRandomInSpawnResource", getRandomInSpawnResource);
+	lua_register(luaEngine->getLuaState(), "logToFile", logToFile);
 	
 	luaEngine->setGlobalInt("POSITIONCHANGED", ObserverEventType::POSITIONCHANGED);
 	luaEngine->setGlobalInt("CLOSECONTAINER", ObserverEventType::CLOSECONTAINER);
@@ -3484,4 +3485,26 @@ int DirectorManager::getRandomInSpawnResource(lua_State* L){
 	}
 	
 	return 1;
+}
+
+// Append a date and time stamped string message to any file on the server
+int DirectorManager::logToFile(lua_State* L){
+	String message = lua_tostring(L, -2);
+	String pathAndFileName = lua_tostring(L, -1);
+	
+	time_t now = time(0);
+	String dt = ctime(&now);
+	String timeStamp = dt.replaceAll("\n", "");
+	 
+	StringBuffer msg;
+	msg << timeStamp << ": " << message << endl;
+	
+	File* file = new File(pathAndFileName);
+	FileWriter* writer = new FileWriter(file, true); // true for append new lines
+	writer->write(msg.toString());
+	writer->close();
+	delete file;
+	delete writer;
+	
+	return 0;
 }

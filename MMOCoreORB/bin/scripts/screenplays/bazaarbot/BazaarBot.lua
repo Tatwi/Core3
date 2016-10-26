@@ -112,10 +112,8 @@ function BazaarBot:cleanInventory()
 end
 
 function BazaarBot:logListing(message)
-	local outputFile = io.open("log/bazaarbot_listings.log", "a")
-	io.output(outputFile)
-	io.write(os.date("%x %X") .. " " .. message .. "\n")
-	io.close(outputFile)
+	local outputFile = "log/bazaarbot_listings.log"
+	logToFile(message, outputFile)
 end
 
 -- Resource Functions
@@ -175,9 +173,9 @@ function BazaarBot:listResources()
 		end
 		
 		if (listedOK == true) then
-			self:logListing("R: " .. resourceName .. " " .. tostring(#self.resStackSizes * self.resStacks) .. " stacks")
+			self:logListing("Resource: " .. resourceName .. " " .. tostring(#self.resStackSizes * self.resStacks) .. " stacks")
 		else
-			self:logListing("R: " .. resourceName .. " Failed")
+			self:logListing("Resource: " .. resourceName .. " Failed")
 		end
 	end
 	
@@ -256,14 +254,14 @@ function BazaarBot:listCraftedItems(configTable, itemTable)
 				if (pItem ~= nil) then
 					bazaarBotListItem(pBazaarBot, pItem, pVendor, self.itemDescription, price)
 				else
-					self:logListing("C: " .. configTable.functionName .. "() Failed: " .. template)
+					self:logListing("Craft: " .. configTable.functionName .. "() Failed: " .. template)
 					return
 				end
 			end
 		end
 	end
 	
-	self:logListing("C: " .. configTable.functionName .. "() OK")
+	self:logListing("Craft: " .. configTable.functionName .. "() OK")
 end
 
 
@@ -309,9 +307,9 @@ function BazaarBot:addMoreLoot()
 			end
 		
 			bazaarBotListItem(pBazaarBot, pItem, pVendor, self.itemDescription, price)
-			self:logListing("L: " .. SceneObject(pItem):getObjectName() .. " (" .. tostring(lootLevel) .. ") " .. tostring(price) .. "cr")
+			self:logListing("Loot: " .. SceneObject(pItem):getObjectName() .. " (" .. tostring(lootLevel) .. ") " .. tostring(price) .. "cr")
 		else
-			self:logListing("L: " .. lootName .. " (" .. tostring(lootLevel) .. ") Failed")
+			self:logListing("Loot: " .. lootName .. " (" .. tostring(lootLevel) .. ") Failed")
 		end
 	end
 end
