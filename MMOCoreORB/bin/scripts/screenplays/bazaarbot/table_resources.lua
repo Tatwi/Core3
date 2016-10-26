@@ -1,3 +1,11 @@
+BBResConfig = {
+	freq = 25, -- how often to generate a listing, minutes + random seconds upto 5 minutes
+	quantity = 2, -- how many resource types per listing
+	stackSizes = {1000, 5000, 10000},
+	stacks = 2, -- how many stacks to list per stack size
+	creditsPerUnit = 3, -- Price of resource is stack size * credits per unit
+}
+
 -- Weighted resources families
 -- The more entries per index, the less likely any one of them will be chosen
 BBResFamWeighted = {

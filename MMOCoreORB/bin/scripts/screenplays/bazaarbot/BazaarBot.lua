@@ -27,13 +27,6 @@ BazaarBot = ScreenPlay:new {
 	terminalID = 3945376, -- Mos Entha, Tatooine
 	itemDescription = "", -- Optional message in the description window.
 	ListingsInit = 30, -- On first boot after this system is installed, the server will loop this many times through the add functions
-	-- Resource Config
-	
-	resGenFreq = 25, -- how often to generate a listing, minutes + random seconds upto 5 minutes
-	resPerGen = 2, -- how many resource types per listing
-	resStackSizes = {1000, 5000, 10000},
-	resStacks = 2, -- how many stacks to list per stack size
-	creditsPerUnit = 3, -- Price of resource is stack size * credits per unit
 }
 
 registerScreenPlay("BazaarBot", true)
@@ -122,7 +115,7 @@ function BazaarBot:addMoreResources()
 	self:cleanInventory()
 	self:listResources()
 	
-	local nextTime = self.resGenFreq * 60*1000 + getRandomNumber(1,300000)
+	local nextTime = BBResConfig.freq * 60*1000 + getRandomNumber(1,300000)
 	
 	if (hasServerEvent("BazaarBotAddResources")) then
 		rescheduleServerEvent("BazaarBotAddResources", nextTime)
@@ -154,14 +147,14 @@ function BazaarBot:listResources()
 	local pBazaarBot = getCreatureObject(self.BazaarBotID)
 	local loggingNames = ""
 	
-	for i = 1, self.resPerGen do -- x number of resources
+	for i = 1, BBResConfig.quantity do -- x number of resources
 		local resourceName = self:pickResource()
 		local listedOK = false
 		
-		for j = 1, #self.resStackSizes do -- x number of stack sizes
-			for k = 1, self.resStacks do -- x number of stacks
-				local pItem = bazaarBotMakeResources(pBazaarBot, resourceName, self.resStackSizes[j])
-				local price = self.resStackSizes[j] * self.creditsPerUnit
+		for j = 1, #BBResConfig.stackSizes do -- x number of stack sizes
+			for k = 1, BBResConfig.stacks do -- x number of stacks
+				local pItem = bazaarBotMakeResources(pBazaarBot, resourceName, BBResConfig.stackSizes[j])
+				local price = BBResConfig.stackSizes[j] * BBResConfig.creditsPerUnit
 				
 				if (pItem ~= nil) then
 					bazaarBotListItem(pBazaarBot, pItem, pVendor, self.itemDescription, price)
@@ -173,7 +166,7 @@ function BazaarBot:listResources()
 		end
 		
 		if (listedOK == true) then
-			self:logListing("Resource: " .. resourceName .. " " .. tostring(#self.resStackSizes * self.resStacks) .. " stacks")
+			self:logListing("Resource: " .. resourceName .. " " .. tostring(#BBResConfig.stackSizes * BBResConfig.stacks) .. " stacks")
 		else
 			self:logListing("Resource: " .. resourceName .. " Failed")
 		end
@@ -300,8 +293,8 @@ function BazaarBot:addMoreLoot()
 		if (pItem ~= nil) then
 			local price = TangibleObject(pItem):getJunkValue()
 			
-			if (price == nil) then
-				price = 2000 + getRandomNumber(1,2000) + lootLevel
+			if (price < 500) then
+				price = getRandomNumber(500,2000) + lootLevel
 			else
 				price = price * 2 + getRandomNumber(1,100) + lootLevel
 			end
@@ -319,13 +312,13 @@ end
 
 function BazaarBot:test(pPlayer, pObject)
 	self:addMoreResources()
-	self:addMoreArmor()
-	self:addMoreMedicine()
-	self:addMoreFood()
-	self:addMoreWeapons()
-	self:addMoreArtisanItems()
-	self:addMoreStructures()
-	self:addMoreLoot()
+	--self:addMoreArmor()
+	--self:addMoreMedicine()
+	--self:addMoreFood()
+	--self:addMoreWeapons()
+	--self:addMoreArtisanItems()
+	--self:addMoreStructures()
+	--self:addMoreLoot()
 	CreatureObject(pPlayer):sendSystemMessage("Test Complete!")
 end
 
