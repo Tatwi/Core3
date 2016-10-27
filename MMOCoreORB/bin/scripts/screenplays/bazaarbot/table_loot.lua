@@ -1,7 +1,6 @@
 BBLootConfig = {
 	freq = 900, -- how often to generate a listing, in seconds
 	quantity = 1, -- how many times unique loot is generated per scheduled task
-	maxStackSize = 10, -- for items that can stack
 	minLevel = 10, 
 	maxLevel = 100, -- 300 is the game's max level
 	eventName = "BazaarBotAddLoot",
@@ -28,7 +27,6 @@ BBLootPriceRanges = {
 -- 1. Roll for 1 - 100 for rarity
 -- 2. Roll 1 - # of indexes in chosen rarity 
 -- 3. Roll for item in chosen index
-
 BBLootItems = {
 	-- Common 1 - 69
 	-- Price 1 - 500

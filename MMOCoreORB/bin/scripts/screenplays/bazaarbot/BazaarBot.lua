@@ -19,6 +19,7 @@ includeFile("bazaarbot/table_food.lua")
 includeFile("bazaarbot/table_weapons.lua")
 includeFile("bazaarbot/table_item_artisan.lua")
 includeFile("bazaarbot/table_structures.lua")
+includeFile("bazaarbot/table_furniture.lua")
 includeFile("bazaarbot/table_loot.lua")
 
 BazaarBot = ScreenPlay:new {
@@ -49,8 +50,18 @@ function BazaarBot:start()
 		createServerEvent(300*1000, "BazaarBot", "initializeListings", "BazaarBotInitializeListings")
 	else
 		-- Schedule the lister events for after server has fully booted
-		createServerEvent(300*1000, "BazaarBot", "startEvents", "BazaarBotStartEvents")
-		createServerEvent(4*60*1000, "BazaarBot", "checkInventory", "BazaarBotCleanInventory")
+		if (hasServerEvent("BazaarBotStartEvents")) then
+		rescheduleServerEvent("BazaarBotStartEvents", 300*1000)
+		else
+			createServerEvent(300*1000, "BazaarBot", "startEvents", "BazaarBotStartEvents")
+		end
+		
+		-- Schedule inventory purging
+		if (hasServerEvent("BazaarBotCleanInventory")) then
+		rescheduleServerEvent("BazaarBotCleanInventory", 4*60*1000)
+		else
+			createServerEvent(4*60*1000, "BazaarBot", "checkInventory", "BazaarBotCleanInventory")
+		end
 	end
 end
 
@@ -62,6 +73,7 @@ function BazaarBot:startEvents()
 	self:addMoreWeapons()
 	self:addMoreArtisanItems()
 	self:addMoreStructures()
+	self:addMoreFurniture()
 	self:addMoreLoot()
 	printf("BazaarBot: All listing events have now started and will repeat on their own periodically.\n")
 end
@@ -76,6 +88,7 @@ function BazaarBot:initializeListings()
 		self:addMoreWeapons()
 		self:addMoreArtisanItems()
 		self:addMoreStructures()
+		self:addMoreFurniture()
 		self:addMoreLoot()
 	end
 	setQuestStatus("BazaarBot:Initialized", 1)
@@ -219,6 +232,10 @@ function BazaarBot:addMoreStructures()
 	self:addMoreCraftedItems(BBStructuresConfig, BBStructuresItems)
 end
 
+function BazaarBot:addMoreFurniture()
+	self:addMoreCraftedItems(BBFurnitureConfig, BBFurnitureItems)
+end
+
 function BazaarBot:addMoreCraftedItems(configTable, itemTable)
 	self:checkInventory()
 	self:listCraftedItems(configTable, itemTable)
@@ -306,8 +323,6 @@ function BazaarBot:addMoreLoot()
 		elseif (rarity > 0) then
 			indexGroup = getRandomNumber(1,4) -- Common
 		end
-		
-		printf("DEBUG ***** indexGroup selected: " .. tostring(indexGroup) .. "\n")
 	
 		local lootName = BBLootItems[indexGroup][getRandomNumber(1,#BBLootItems[indexGroup])]
 		local lootLevel = getRandomNumber(BBLootConfig.minLevel,BBLootConfig.maxLevel)
@@ -338,12 +353,13 @@ end
 
 function BazaarBot:test(pPlayer, pObject)
 	--self:addMoreResources()
-	self:addMoreArmor()
+	--self:addMoreArmor()
 	--self:addMoreMedicine()
 	--self:addMoreFood()
 	--self:addMoreWeapons()
 	--self:addMoreArtisanItems()
 	--self:addMoreStructures()
+	self:addMoreFurniture()
 	--for i = 1, 100 do
 	--	self:addMoreLoot()
 	--end
