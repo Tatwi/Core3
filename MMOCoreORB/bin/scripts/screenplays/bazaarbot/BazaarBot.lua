@@ -10,6 +10,7 @@ includeFile("bazaarbot/table_weapons.lua")
 includeFile("bazaarbot/table_item_artisan.lua")
 includeFile("bazaarbot/table_structures.lua")
 includeFile("bazaarbot/table_furniture.lua")
+includeFile("bazaarbot/table_clothing.lua")
 includeFile("bazaarbot/table_loot.lua")
 
 BazaarBot = ScreenPlay:new {
@@ -64,6 +65,7 @@ function BazaarBot:startEvents()
 	self:addMoreArtisanItems()
 	self:addMoreStructures()
 	self:addMoreFurniture()
+	self:addMoreClothing()
 	self:addMoreLoot()
 	printf("BazaarBot: All listing events have now started and will repeat on their own periodically.\n")
 end
@@ -79,6 +81,7 @@ function BazaarBot:initializeListings()
 		self:addMoreArtisanItems()
 		self:addMoreStructures()
 		self:addMoreFurniture()
+		self:addMoreClothing()
 		self:addMoreLoot()
 	end
 	setQuestStatus("BazaarBot:Initialized", 1)
@@ -226,6 +229,10 @@ function BazaarBot:addMoreFurniture()
 	self:addMoreCraftedItems(BBFurnitureConfig, BBFurnitureItems)
 end
 
+function BazaarBot:addMoreClothing()
+	self:addMoreCraftedItems(BBClothingConfig, BBClothingItems)
+end
+
 function BazaarBot:addMoreCraftedItems(configTable, itemTable)
 	self:checkInventory()
 	self:listCraftedItems(configTable, itemTable)
@@ -349,7 +356,8 @@ function BazaarBot:test(pPlayer, pObject)
 	--self:addMoreWeapons()
 	--self:addMoreArtisanItems()
 	--self:addMoreStructures()
-	self:addMoreFurniture()
+	--self:addMoreFurniture()
+	self:addMoreClothing()
 	--for i = 1, 100 do
 	--	self:addMoreLoot()
 	--end
