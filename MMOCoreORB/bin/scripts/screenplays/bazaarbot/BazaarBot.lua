@@ -1,16 +1,6 @@
--- Tarkin AuctionBot
+-- Tarkin BazaarBot
 -- A simple way to populate the bazaar with goods
--- Created by R. Bassett Jr. (www.tpot.ca) 2016
---
--- New C++ Lua calls in Director Manager:
--- bazaarBotMakeCraftedItem(): Generates a crafted item or crate and places it into BazaarBot's inventory, returning the object pointer
---  bazaarBotMakeCraftedItem(pBazaarBot, string draftSchematicScript, quantity, quality, AlternateTemplateNumber)
--- bazaarBotMakeLootItem(): Generates a looted item and places it into BazaarBot's inventory, returning the object pointer
---  bazaarBotMakeLootItem(pBazaarBot, string lootGroup, int level, bool maxCondition)
--- bazaarBotMakeResourceStack(): Generates a stack of resources and places it into BazaarBot's inventory, returning the object pointer
---
--- bazaarBotListItem(): Sells the item provided on the desired bazaar
---  bazaarBotListItem(pBazaarBot, itemObjectID, pBazzarTerminal, string description, int price, int duration in seconds, bool auction, bool premium)
+-- See README.md for documentation
 
 includeFile("bazaarbot/table_resources.lua")
 includeFile("bazaarbot/table_armor.lua")
@@ -40,7 +30,7 @@ function BazaarBot:start()
 		return
 	end
 
-	-- Testing trigger object
+	-- Testing trigger object (WARNING: ANY PLAYER CAN INTERACT WITH IT!)
 	self:loadTestingObject()
 	
 	-- Populate a new server's bazaar 
@@ -403,3 +393,4 @@ end
 function ABTestMenuComponent:noCallback(pPlayer, pSui, eventIndex)
 	-- do nothing
 end
+

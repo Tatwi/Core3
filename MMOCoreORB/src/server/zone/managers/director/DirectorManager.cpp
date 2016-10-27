@@ -3192,7 +3192,7 @@ void DirectorManager::removeQuestVectorMap(const String& keyString) {
 }
 
 // BazaarBot item listing functionality
-// bazaarBotListItem(pBazaarBot, objectID, pBazzarTerminal, string description, int price)
+// bazaarBotListItem(pBazaarBot, pObject, pBazzarTerminal, string description, int price)
 int DirectorManager::bazaarBotListItem(lua_State* L) {
 	Reference<CreatureObject*> player = (CreatureObject*)lua_touserdata(L, -5);
 	Reference<SceneObject*> itemToSell = (SceneObject*)lua_touserdata(L, -4);
